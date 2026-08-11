@@ -1,1885 +1,474 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CarePulse - Multi-Device Sickness Tracker</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CarePulse Health & Symptom Tracker</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- QR Code Generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#f0fdfa',
-                            100: '#ccfbf1',
-                            500: '#14b8a6',
-                            600: '#0d9488',
-                            700: '#0f766e',
-                            800: '#115e59',
-                            900: '#134e4a',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        
-        @media print {
-            .no-print { display: none !important; }
-            .print-only { display: block !important; }
-            body { background: white !important; color: black !important; }
-            .print-card { border: 1px solid #e2e8f0 !important; box-shadow: none !important; }
-        }
-        .print-only { display: none; }
-    </style>
+  <!-- Firebase Real-Time SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDemoKeyCarePulseSync2026",
+      authDomain: "carepulse-tracker.firebaseapp.com",
+      projectId: "carepulse-tracker",
+      storageBucket: "carepulse-tracker.appspot.com",
+      messagingSenderId: "102938475612",
+      appId: "1:102938475612:web:a1b2c3d4e5f6g7h8i9j0"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.FirebaseDB = db;
+    window.doc = doc;
+    window.onSnapshot = onSnapshot;
+    window.setDoc = setDoc;
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+
+  <style>
+    .glass-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 4px;
+    }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
 
-    <!-- Firebase Modular Setup for Cloud Sync across Pixel 10 Pro & Galaxy S23+ -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Environment variables
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'carepulse-health-tracker';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "demo-key",
-            authDomain: "demo.firebaseapp.com",
-            projectId: "demo-project",
-            storageBucket: "demo.appspot.com",
-            messagingSenderId: "123456",
-            appId: "1:123456:web:demo"
-        };
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        window.CarePulseCloud = {
-            db,
-            auth,
-            appId,
-            userId: null,
-            syncDocId: null,
-            unsub: null,
-            
-            async init() {
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (e) {
-                    console.warn("Auth fallback:", e);
-                }
-
-                onAuthStateChanged(auth, async (user) => {
-                    if (!user) return;
-                    this.userId = user.uid;
-                    
-                    // Check local storage for shared sync key or default to user.uid
-                    const storedSyncId = localStorage.getItem('carepulse_sync_code') || this.userId;
-                    this.setSyncCode(storedSyncId);
-                    
-                    document.getElementById('cloud-sync-status-badge').innerHTML = `
-                        <i class="fa-solid fa-cloud text-emerald-400 animate-pulse"></i>
-                        <span class="text-xs font-semibold text-emerald-200">Cloud Synced</span>
-                    `;
-                });
-            },
-
-            setSyncCode(syncId) {
-                this.syncDocId = syncId;
-                localStorage.setItem('carepulse_sync_code', syncId);
-                const displayEl = document.getElementById('display-sync-id');
-                if (displayEl) displayEl.innerText = syncId;
-
-                if (this.unsub) this.unsub();
-
-                // Firestore Path: /artifacts/{appId}/public/data/user_syncs/{syncId} (6 segments = valid document ref)
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_syncs', 'sickness_sync_' + syncId);
-                
-                this.unsub = onSnapshot(docRef, (snapshot) => {
-                    if (snapshot.exists()) {
-                        const cloudData = snapshot.data();
-                        if (cloudData && cloudData.state) {
-                            window.appData = cloudData.state;
-                            window.initApp(false); // Render without re-pushing to cloud
-                            window.showToast("Data synced from Cloud 📱⚡📱", "info");
-                        }
-                    } else {
-                        // First time doc creation
-                        this.pushState(window.appData);
-                    }
-                }, (err) => {
-                    console.error("Firestore sync error:", err);
-                });
-            },
-
-            async pushState(data) {
-                if (!this.syncDocId || !this.userId) return;
-                try {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_syncs', 'sickness_sync_' + this.syncDocId);
-                    await setDoc(docRef, {
-                        state: data,
-                        updatedBy: this.userId,
-                        lastUpdated: new Date().toISOString()
-                    });
-                } catch (e) {
-                    console.error("Failed to push state to Cloud:", e);
-                }
-            }
-        };
-
-        window.CarePulseCloud.init();
-    </script>
-
-    <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 no-print shadow-lg">
-        <!-- Multi-Device Sync Subheader Bar -->
-        <div class="bg-indigo-950/80 border-b border-indigo-800/40 px-4 py-1.5 text-xs">
-            <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
-                <div class="flex items-center space-x-2">
-                    <span id="cloud-sync-status-badge" class="flex items-center gap-1.5 bg-indigo-900/60 px-2 py-0.5 rounded-full text-indigo-300">
-                        <i class="fa-solid fa-spinner fa-spin text-indigo-400"></i>
-                        <span>Connecting Cloud Sync...</span>
-                    </span>
-                    <span class="hidden sm:inline text-indigo-300/80">|</span>
-                    <span class="hidden sm:inline text-indigo-200">
-                        <i class="fa-solid fa-mobile-screen-button text-xs text-indigo-400 mr-1"></i>
-                        Sync between <strong>Pixel 10 Pro</strong> & <strong>Galaxy S23+</strong>
-                    </span>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <span class="text-slate-400 text-[11px]">Sync ID:</span>
-                    <code id="display-sync-id" class="font-mono bg-indigo-900/90 text-amber-300 px-2 py-0.5 rounded border border-indigo-700/50 text-[11px] font-bold">Connecting...</code>
-                    <button onclick="copySyncCode()" title="Copy Sync ID" class="hover:text-white text-indigo-300 px-1.5 py-0.5 bg-indigo-900/50 hover:bg-indigo-800 rounded transition-colors text-[11px]">
-                        <i class="fa-solid fa-copy"></i>
-                    </button>
-                    <button onclick="openSyncModal()" class="text-xs bg-indigo-600 hover:bg-indigo-500 font-bold px-2.5 py-0.5 rounded text-white transition-all">
-                        <i class="fa-solid fa-arrows-rotate mr-1"></i> Pair Devices
-                    </button>
-                </div>
-            </div>
+  <!-- TOP HEADER & REAL-TIME SYNC STATUS -->
+  <header class="bg-indigo-900 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="bg-indigo-600 p-2 rounded-lg text-white">
+          <i class="fa-solid fa-heart-pulse text-2xl"></i>
         </div>
-
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <!-- Brand Logo -->
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center text-white shadow-md shadow-rose-500/20">
-                        <i class="fa-solid fa-notes-medical text-xl"></i>
-                    </div>
-                    <div>
-                        <span class="font-bold text-xl text-white tracking-tight flex items-center gap-1.5">
-                            CarePulse <span class="text-xs font-semibold px-2 py-0.5 bg-rose-500/20 text-rose-300 rounded-full border border-rose-500/30">Cross-Device Sickness Log</span>
-                        </span>
-                        <p class="text-xs text-slate-400 hidden sm:block">Real-Time Illness, Fever & Symptom Sync for Android & Web</p>
-                    </div>
-                </div>
-
-                <!-- Desktop Navigation -->
-                <nav class="hidden lg:flex space-x-1 bg-slate-800/80 p-1 rounded-xl text-sm font-medium border border-slate-700/50">
-                    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn px-3.5 py-2 rounded-lg transition-all text-rose-400 bg-slate-900 shadow-sm font-semibold">
-                        <i class="fa-solid fa-head-side-cough mr-1.5"></i> Sickness Episodes
-                    </button>
-                    <button onclick="switchTab('symptoms')" id="nav-symptoms" class="nav-btn px-3.5 py-2 rounded-lg text-slate-300 hover:text-white transition-all">
-                        <i class="fa-solid fa-temperature-three-quarters mr-1.5"></i> Symptom Logs
-                    </button>
-                    <button onclick="switchTab('medications')" id="nav-medications" class="nav-btn px-3.5 py-2 rounded-lg text-slate-300 hover:text-white transition-all">
-                        <i class="fa-solid fa-pills mr-1.5"></i> Treatments & Meds
-                    </button>
-                    <button onclick="switchTab('appointments')" id="nav-appointments" class="nav-btn px-3.5 py-2 rounded-lg text-slate-300 hover:text-white transition-all">
-                        <i class="fa-solid fa-user-doctor mr-1.5"></i> Visits & Urgent Care
-                    </button>
-                    <button onclick="switchTab('ai')" id="nav-ai" class="nav-btn px-3.5 py-2 rounded-lg text-purple-300 hover:text-white transition-all font-semibold bg-purple-900/30 hover:bg-purple-900/50 border border-purple-500/30">
-                        <i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-purple-400"></i> AI Assistant
-                    </button>
-                    <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-btn px-3.5 py-2 rounded-lg text-slate-300 hover:text-white transition-all">
-                        <i class="fa-solid fa-chart-pie mr-1.5"></i> History & Charts
-                    </button>
-                    <button onclick="switchTab('report')" id="nav-report" class="nav-btn px-3.5 py-2 rounded-lg text-slate-300 hover:text-white transition-all">
-                        <i class="fa-solid fa-file-medical mr-1.5"></i> Doctor Summary
-                    </button>
-                </nav>
-
-                <!-- Action Buttons -->
-                <div class="flex items-center space-x-2">
-                    <button onclick="openImportModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3.5 py-2 rounded-xl text-sm transition-all shadow-md flex items-center gap-2">
-                        <i class="fa-solid fa-file-csv text-xs"></i>
-                        <span class="hidden sm:inline">Import Sheet</span>
-                    </button>
-                    <button onclick="openEpisodeModal()" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold px-3.5 py-2 rounded-xl text-sm transition-all shadow-md shadow-rose-500/20 flex items-center gap-2">
-                        <i class="fa-solid fa-plus text-xs"></i>
-                        <span class="hidden sm:inline">Log New Sickness</span>
-                    </button>
-                    <button onclick="resetDataConfirmation()" title="Reset Sample Data" class="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all">
-                        <i class="fa-solid fa-rotate-right"></i>
-                    </button>
-                </div>
-            </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">CarePulse</h1>
+          <p class="text-xs text-indigo-200">Real-Time Cloud Sickness Tracker</p>
         </div>
+      </div>
 
-        <!-- Mobile Nav Bar -->
-        <div class="lg:hidden border-t border-slate-800 bg-slate-900 px-2 py-1.5 flex justify-around text-[11px] font-medium">
-            <button onclick="switchTab('dashboard')" id="mobile-nav-dashboard" class="mobile-nav-btn p-1.5 text-rose-400 font-semibold flex flex-col items-center">
-                <i class="fa-solid fa-head-side-cough text-base mb-0.5"></i>
-                <span>Episodes</span>
-            </button>
-            <button onclick="switchTab('symptoms')" id="mobile-nav-symptoms" class="mobile-nav-btn p-1.5 text-slate-400 flex flex-col items-center">
-                <i class="fa-solid fa-temperature-three-quarters text-base mb-0.5"></i>
-                <span>Symptoms</span>
-            </button>
-            <button onclick="switchTab('ai')" id="mobile-nav-ai" class="mobile-nav-btn p-1.5 text-purple-400 flex flex-col items-center">
-                <i class="fa-solid fa-wand-magic-sparkles text-base mb-0.5"></i>
-                <span>AI Assistant</span>
-            </button>
-            <button onclick="switchTab('medications')" id="mobile-nav-medications" class="mobile-nav-btn p-1.5 text-slate-400 flex flex-col items-center">
-                <i class="fa-solid fa-pills text-base mb-0.5"></i>
-                <span>Treatments</span>
-            </button>
-            <button onclick="switchTab('report')" id="mobile-nav-report" class="mobile-nav-btn p-1.5 text-slate-400 flex flex-col items-center">
-                <i class="fa-solid fa-file-medical text-base mb-0.5"></i>
-                <span>Report</span>
-            </button>
-        </div>
-    </header>
-
-    <!-- Toast Notifications -->
-    <div id="toast-container" class="fixed top-24 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
-
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-
-        <section id="tab-dashboard" class="tab-content space-y-6">
-            
-            <!-- Hero Banner -->
-            <div class="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-700 rounded-2xl p-6 text-white shadow-lg shadow-rose-900/10 relative overflow-hidden">
-                <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-                <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div>
-                        <div class="inline-flex items-center gap-2 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full text-xs font-semibold mb-3">
-                            <i class="fa-solid fa-mobile-screen-button"></i>
-                            <span>Multi-Device Sync Enabled (Pixel 10 Pro + Galaxy S23+)</span>
-                        </div>
-                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Are you currently experiencing an illness?</h1>
-                        <p class="text-rose-100 text-sm mt-1 max-w-xl">Log sickness events when they happen—track fever, symptom progression, meds taken, and sync instantly across all your devices.</p>
-                    </div>
-
-                    <div class="flex flex-wrap items-center gap-3">
-                        <button onclick="openEpisodeModal()" class="bg-white text-rose-700 hover:bg-rose-50 font-bold px-4 py-2.5 rounded-xl text-sm transition-all shadow-md flex items-center gap-2">
-                            <i class="fa-solid fa-head-side-cough text-base"></i>
-                            <span>Log New Sickness Event</span>
-                        </button>
-                        <button onclick="openImportModal()" class="bg-white/20 hover:bg-white/30 text-white font-semibold px-4 py-2.5 rounded-xl text-sm backdrop-blur-md border border-white/20 transition-all flex items-center gap-2">
-                            <i class="fa-solid fa-file-import text-xs"></i>
-                            <span>Import Past Sicknesses</span>
-                        </button>
-                        <button onclick="openSymptomModal()" class="bg-white/20 hover:bg-white/30 text-white font-semibold px-4 py-2.5 rounded-xl text-sm backdrop-blur-md border border-white/20 transition-all flex items-center gap-2">
-                            <i class="fa-solid fa-plus text-xs"></i>
-                            <span>Add Symptom Entry</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- AI Quick Natural Language Symptom Logger Card -->
-            <div class="bg-gradient-to-r from-purple-900 via-slate-900 to-indigo-900 text-white rounded-2xl p-5 shadow-md border border-purple-500/20 space-y-3">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold">
-                            <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-sm tracking-wide">AI Quick-Log Symptom Assistant</h3>
-                            <p class="text-xs text-purple-200">Type or speak in plain language on your Pixel or Galaxy phone. Gemini AI parses & logs it automatically.</p>
-                        </div>
-                    </div>
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-400/30 uppercase tracking-wider">Powered by Gemini 3.1</span>
-                </div>
-
-                <div class="flex flex-col sm:flex-row gap-2">
-                    <div class="relative flex-1">
-                        <input type="text" id="ai-quick-log-input" placeholder="e.g., Temperature 101.8°F, throbbing headache pain 8 out of 10..." class="w-full text-xs sm:text-sm px-4 py-3 bg-white/10 text-white placeholder-purple-200/60 border border-purple-400/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400">
-                    </div>
-                    <button onclick="handleAiQuickLog()" id="ai-quick-log-btn" class="bg-purple-600 hover:bg-purple-500 text-white font-bold px-5 py-3 rounded-xl text-xs sm:text-sm transition-all shadow-md flex items-center justify-center gap-2 shrink-0">
-                        <i class="fa-solid fa-bolt"></i>
-                        <span>AI Parse & Sync Entry</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Key Metrics Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                    <div class="flex justify-between items-start mb-3">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Illnesses</span>
-                        <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-                            <i class="fa-solid fa-virus"></i>
-                        </div>
-                    </div>
-                    <div class="flex items-baseline gap-2">
-                        <span id="stat-active-episodes-count" class="text-3xl font-extrabold text-slate-900">0</span>
-                        <span class="text-xs text-slate-500 font-medium">ongoing</span>
-                    </div>
-                    <p id="stat-active-status" class="text-xs text-rose-600 font-semibold mt-2 flex items-center gap-1">
-                        Active illness logged
-                    </p>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                    <div class="flex justify-between items-start mb-3">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Sick Days</span>
-                        <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                            <i class="fa-solid fa-calendar-xmark"></i>
-                        </div>
-                    </div>
-                    <div class="flex items-baseline gap-2">
-                        <span id="stat-sick-days" class="text-3xl font-extrabold text-slate-900">0</span>
-                        <span class="text-xs text-slate-500 font-medium">days</span>
-                    </div>
-                    <p class="text-xs text-slate-500 mt-2 font-medium">Across all logged episodes</p>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                    <div class="flex justify-between items-start mb-3">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Logged Symptoms</span>
-                        <div class="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center font-bold">
-                            <i class="fa-solid fa-temperature-three-quarters"></i>
-                        </div>
-                    </div>
-                    <div class="flex items-baseline gap-2">
-                        <span id="stat-total-symptom-entries" class="text-3xl font-extrabold text-slate-900">0</span>
-                        <span class="text-xs text-slate-500 font-medium">entries</span>
-                    </div>
-                    <p id="stat-symptom-avg-severity" class="text-xs text-slate-500 font-medium mt-2">Avg intensity: 0/10</p>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                    <div class="flex justify-between items-start mb-3">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Next Doctor Visit</span>
-                        <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                            <i class="fa-solid fa-user-doctor"></i>
-                        </div>
-                    </div>
-                    <div class="truncate">
-                        <span id="stat-next-appointment-date" class="text-xl font-bold text-slate-900 block truncate">None scheduled</span>
-                        <span id="stat-next-appointment-doctor" class="text-xs text-slate-500 font-medium truncate block mt-0.5">Click Visits to schedule</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Ongoing & Recent Sickness Episodes -->
-            <div class="space-y-4">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        <i class="fa-solid fa-head-side-cough text-rose-600"></i>
-                        Sickness Episodes & Events
-                    </h2>
-                    <button onclick="openEpisodeModal()" class="text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition-colors">
-                        + Start New Sickness Log
-                    </button>
-                </div>
-
-                <div id="dashboard-episodes-container" class="space-y-4">
-                    <!-- Dynamic Illness Cards generated via JS -->
-                </div>
-            </div>
-
-            <!-- Quick Chart -->
-            <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="font-bold text-slate-900 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-line text-rose-600"></i>
-                        Sickness Severity Trend
-                    </h3>
-                    <button onclick="switchTab('analytics')" class="text-xs font-semibold text-rose-600 hover:text-rose-700">Detailed Sickness Analytics &rarr;</button>
-                </div>
-                <div class="h-48 w-full relative">
-                    <canvas id="quick-trend-chart"></canvas>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- Other Tabs -->
-        <section id="tab-symptoms" class="tab-content hidden space-y-6">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900">Symptom Log & Progression</h2>
-                    <p class="text-xs text-slate-500">Record individual symptom readings, fever measurements, and notes during an illness.</p>
-                </div>
-                <button onclick="openSymptomModal()" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-all shadow-md flex items-center gap-2 self-start sm:self-auto">
-                    <i class="fa-solid fa-plus text-xs"></i>
-                    <span>Log Symptom Reading</span>
-                </button>
-            </div>
-
-            <!-- Filters -->
-            <div class="flex flex-col sm:flex-row gap-3">
-                <input type="text" id="symptom-search" oninput="renderSymptoms()" placeholder="Search symptoms, notes..." class="text-sm px-4 py-2 bg-white border border-slate-200 rounded-xl flex-1 focus:outline-none focus:ring-2 focus:ring-rose-500">
-                <select id="symptom-filter-episode" onchange="renderSymptoms()" class="text-sm px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 font-semibold">
-                    <option value="ALL">All Illness Episodes</option>
-                </select>
-            </div>
-
-            <div id="symptoms-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- Dynamic Symptom Cards -->
-            </div>
-        </section>
-
-        <section id="tab-medications" class="tab-content hidden space-y-6">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900">Treatments & Medications</h2>
-                    <p class="text-xs text-slate-500">Keep track of antibiotics, fever reducers, and prescriptions prescribed for your sicknesses.</p>
-                </div>
-                <button onclick="openMedicationModal()" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-all shadow-md flex items-center gap-2 self-start sm:self-auto">
-                    <i class="fa-solid fa-plus text-xs"></i>
-                    <span>Add Treatment</span>
-                </button>
-            </div>
-
-            <div id="medications-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <!-- Dynamic Med Cards -->
-            </div>
-        </section>
-
-        <section id="tab-appointments" class="tab-content hidden space-y-6">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900">Urgent Care & Doctor Visits</h2>
-                    <p class="text-xs text-slate-500">Log clinic visits, urgent care consultations, and follow-up appointments.</p>
-                </div>
-                <button onclick="openAppointmentModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-all shadow-md flex items-center gap-2 self-start sm:self-auto">
-                    <i class="fa-solid fa-plus text-xs"></i>
-                    <span>Log Visit / Appointment</span>
-                </button>
-            </div>
-
-            <div id="appointments-list-container" class="space-y-4">
-                <!-- Dynamic Appointment Cards -->
-            </div>
-        </section>
-
-        <section id="tab-ai" class="tab-content hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                    <div>
-                        <div class="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full mb-2">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Gemini AI Sickness Insights
-                        </div>
-                        <h2 class="text-xl font-bold text-slate-900">Doctor Prep, Warning Signs & Recovery Plan</h2>
-                        <p class="text-xs text-slate-500">Select an illness episode to generate a customized clinical briefing, doctor questions, and care steps.</p>
-                    </div>
-
-                    <div class="flex flex-wrap items-center gap-3">
-                        <select id="ai-episode-select" class="text-sm px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold focus:ring-2 focus:ring-purple-500">
-                            <!-- Dynamic Options -->
-                        </select>
-                        <button onclick="generateAiEpisodeInsights()" id="ai-generate-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-sm shadow-md flex items-center gap-2">
-                            <i class="fa-solid fa-sparkles"></i>
-                            <span>Generate AI Insights</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div id="ai-insights-container" class="space-y-6">
-                    <div class="p-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
-                        <div class="w-12 h-12 mx-auto rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center text-xl">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i>
-                        </div>
-                        <h3 class="font-bold text-slate-800 text-sm">No Sickness Analyzed Yet</h3>
-                        <p class="text-xs text-slate-500 max-w-md mx-auto">Select a sickness episode above and click "Generate AI Insights" to prepare doctor questions, identify red flag warnings, and get recovery care advice.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="tab-analytics" class="tab-content hidden space-y-6">
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <h2 class="text-lg font-bold text-slate-900">Sickness Analytics & History</h2>
-                <p class="text-xs text-slate-500">Identify patterns in illness frequency, recovery duration, and severity.</p>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-                    <h3 class="font-bold text-slate-900 text-sm">Illness Category Breakdown</h3>
-                    <div class="h-64 relative">
-                        <canvas id="category-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-                    <h3 class="font-bold text-slate-900 text-sm">Symptom Severity Over Time</h3>
-                    <div class="h-64 relative">
-                        <canvas id="severity-trend-chart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="tab-report" class="tab-content hidden space-y-6">
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between sm:items-center gap-4 no-print">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900">Doctor Episode Summary Report</h2>
-                    <p class="text-xs text-slate-500">Select an illness episode to generate a clean, printable medical report for your doctor or urgent care visit.</p>
-                </div>
-                
-                <div class="flex items-center gap-3">
-                    <select id="report-episode-select" onchange="renderReport()" class="text-sm px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 font-semibold">
-                        <!-- Dynamic options -->
-                    </select>
-                    <button onclick="window.print()" class="bg-slate-900 hover:bg-black text-white font-semibold px-4 py-2 rounded-xl text-sm transition-all shadow-md flex items-center gap-2">
-                        <i class="fa-solid fa-print"></i>
-                        <span>Print Report</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Printable Card Container -->
-            <div id="printable-report-container" class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm print-card space-y-6">
-                <!-- Generated Report Content -->
-            </div>
-        </section>
-
-    </main>
-
-    <!-- DEVICE PAIRING & SYNC MODAL -->
-    <div id="sync-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 my-8 space-y-4">
-            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
-                <div class="flex items-center gap-2">
-                    <div class="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
-                        <i class="fa-solid fa-mobile-screen-button text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-base text-slate-900">Pair Android Devices</h3>
-                        <p class="text-xs text-slate-500">Pixel 10 Pro & Galaxy S23+ Sync</p>
-                    </div>
-                </div>
-                <button onclick="closeSyncModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-
-            <p class="text-xs text-slate-600 leading-relaxed">
-                To sync sickness records live across multiple phones (like your Pixel 10 Pro and Galaxy S23+), ensure both phones use the exact same <strong>Sync ID</strong> below.
-            </p>
-
-            <div class="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                <label class="block text-xs font-bold text-slate-700">Your Current Sync ID:</label>
-                <div class="flex gap-2">
-                    <input type="text" id="sync-code-input" class="flex-1 text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800">
-                    <button onclick="applyNewSyncCode()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow transition-all">
-                        Connect
-                    </button>
-                </div>
-            </div>
-
-            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-900 space-y-1">
-                <p class="font-bold flex items-center gap-1"><i class="fa-solid fa-lightbulb text-amber-600"></i> How to pair your phones:</p>
-                <ol class="list-decimal pl-4 space-y-0.5">
-                    <li>Copy the Sync ID from your Pixel 10 Pro.</li>
-                    <li>Open this app on your Galaxy S23+, paste the ID here, and tap <strong>Connect</strong>.</li>
-                    <li>Now any sickness logged on either phone will sync automatically!</li>
-                </ol>
-            </div>
-
-            <div class="flex justify-end pt-2">
-                <button onclick="closeSyncModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl">Close</button>
-            </div>
-        </div>
+      <!-- Sync Status Indicator -->
+      <div class="flex items-center space-x-2 bg-indigo-800/80 px-3 py-1.5 rounded-full border border-indigo-700 text-xs">
+        <span id="sync-status-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+        <span id="sync-status-text" class="font-medium text-indigo-100">Auto-Synced</span>
+        <button onclick="openPairingModal()" class="ml-2 bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-md transition font-medium flex items-center gap-1">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Pair Code
+        </button>
+      </div>
     </div>
+  </header>
 
-    <!-- EPISODE MODAL -->
-    <div id="episode-modal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-8">
-            <div class="flex justify-between items-center pb-4 border-b border-slate-100">
-                <h3 class="font-bold text-lg text-slate-900 flex items-center gap-2">
-                    <i class="fa-solid fa-virus text-rose-600"></i>
-                    Log Sickness Event / Illness Episode
-                </h3>
-                <button onclick="closeEpisodeModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-
-            <form id="episode-form" onsubmit="handleEpisodeSubmit(event)" class="mt-4 space-y-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Illness / Event Name *</label>
-                    <input type="text" id="ep-title" required placeholder="e.g., Seasonal Flu, Acute Sinusitis, Food Poisoning, Covid-19" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500">
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Category *</label>
-                        <select id="ep-category" required class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 font-semibold">
-                            <option value="Viral / Respiratory (Flu, Cold, Covid)">Viral / Respiratory (Flu, Cold, Covid)</option>
-                            <option value="Bacterial / Infection">Bacterial / Infection</option>
-                            <option value="Stomach Bug / Digestive">Stomach Bug / Digestive</option>
-                            <option value="Neurological / Migraine">Neurological / Migraine</option>
-                            <option value="Allergies / Asthma Flare">Allergies / Asthma Flare</option>
-                            <option value="Injury / Acute Pain">Injury / Acute Pain</option>
-                            <option value="Other Sickness">Other Sickness</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Start Date *</label>
-                        <input type="date" id="ep-startDate" required class="w-full text-sm px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Primary Symptoms</label>
-                    <input type="text" id="ep-primarySymptoms" placeholder="e.g., High fever 101.4°F, sore throat, chills, body aches" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Diagnosis / Initial Notes</label>
-                    <textarea id="ep-notes" rows="3" placeholder="e.g., Onset started Thursday night. Urgent care confirmed bacterial sinus infection..." class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"></textarea>
-                </div>
-
-                <div class="flex justify-end gap-3 pt-3 border-t border-slate-100">
-                    <button type="button" onclick="closeEpisodeModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
-                    <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-500/20">Create Sickness Episode</button>
-                </div>
-            </form>
-        </div>
+  <!-- NAVIGATION TABS -->
+  <nav class="bg-white border-b border-slate-200 sticky top-[61px] z-20 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 flex space-x-1 overflow-x-auto custom-scrollbar text-sm font-medium">
+      <button onclick="switchTab('episodes')" id="tab-btn-episodes" class="nav-tab py-3 px-4 text-indigo-600 border-b-2 border-indigo-600 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-bed-pulse"></i> Sickness Episodes
+      </button>
+      <button onclick="switchTab('logs')" id="tab-btn-logs" class="nav-tab py-3 px-4 text-slate-600 hover:text-indigo-600 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-notes-medical"></i> Symptom Logs
+      </button>
+      <button onclick="switchTab('meds')" id="tab-btn-meds" class="nav-tab py-3 px-4 text-slate-600 hover:text-indigo-600 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-pills"></i> Treatments & Meds
+      </button>
+      <button onclick="switchTab('import')" id="tab-btn-import" class="nav-tab py-3 px-4 text-slate-600 hover:text-indigo-600 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-file-import"></i> Import Sheets
+      </button>
+      <button onclick="switchTab('summary')" id="tab-btn-summary" class="nav-tab py-3 px-4 text-slate-600 hover:text-indigo-600 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-file-waveform"></i> Doctor Summary
+      </button>
     </div>
+  </nav>
 
-    <!-- SYMPTOM MODAL -->
-    <div id="symptom-modal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-8">
-            <div class="flex justify-between items-center pb-4 border-b border-slate-100">
-                <h3 class="font-bold text-lg text-slate-900 flex items-center gap-2">
-                    <i class="fa-solid fa-temperature-three-quarters text-rose-600"></i>
-                    Log Symptom Reading
-                </h3>
-                <button onclick="closeSymptomModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-
-            <form id="symptom-form" onsubmit="handleSymptomSubmit(event)" class="mt-4 space-y-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Associated Sickness Episode *</label>
-                    <select id="sym-episodeId" required class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 font-semibold">
-                        <!-- Dynamic Options -->
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Symptom Name *</label>
-                        <input type="text" id="sym-name" required placeholder="e.g., Fever, Sinus Pressure, Nausea, Sore Throat" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Body Area / Category</label>
-                        <select id="sym-category" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 font-semibold">
-                            <option value="Head & Neurological">Head & Neurological</option>
-                            <option value="Chest & Respiratory">Chest & Respiratory</option>
-                            <option value="Stomach & Digestive">Stomach & Digestive</option>
-                            <option value="Body & Systemic (Fever/Chills)">Body & Systemic (Fever/Chills)</option>
-                            <option value="Throat & Ear">Throat & Ear</option>
-                            <option value="Other Area">Other Area</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <div class="flex justify-between text-xs font-bold uppercase text-slate-500 mb-1">
-                        <span>Severity Intensity *</span>
-                        <span id="sym-severity-val" class="text-rose-600 font-extrabold text-sm">7 / 10</span>
-                    </div>
-                    <input type="range" id="sym-severity" min="1" max="10" value="7" oninput="document.getElementById('sym-severity-val').innerText = this.value + ' / 10'" class="w-full accent-rose-600">
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Date *</label>
-                        <input type="date" id="sym-date" required class="w-full text-sm px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Time</label>
-                        <input type="time" id="sym-time" class="w-full text-sm px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Notes (e.g. Temp reading, triggers)</label>
-                    <textarea id="sym-notes" rows="2" placeholder="e.g., Temp measured 101.4°F with oral thermometer. Took 500mg Tylenol." class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"></textarea>
-                </div>
-
-                <div class="flex justify-end gap-3 pt-3 border-t border-slate-100">
-                    <button type="button" onclick="closeSymptomModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
-                    <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-500/20">Save Symptom Reading</button>
-                </div>
-            </form>
+  <!-- CONTENT CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+    
+    <!-- EPISODES TAB -->
+    <section id="tab-episodes" class="tab-content space-y-6">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Sickness Episodes</h2>
+          <p class="text-slate-500 text-sm">Log illnesses when they happen (e.g., Flu, Migraine, Food Poisoning).</p>
         </div>
-    </div>
+        <button onclick="openNewEpisodeModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium shadow-sm transition flex items-center gap-2">
+          <i class="fa-solid fa-plus"></i> New Sickness Episode
+        </button>
+      </div>
 
-    <!-- TREATMENT / MEDICATION MODAL -->
-    <div id="medication-modal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-8">
-            <div class="flex justify-between items-center pb-4 border-b border-slate-100">
-                <h3 class="font-bold text-lg text-slate-900 flex items-center gap-2">
-                    <i class="fa-solid fa-pills text-brand-600"></i>
-                    Add Treatment / Prescription
-                </h3>
-                <button onclick="closeMedicationModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
+      <div id="episodes-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Dynamically rendered -->
+      </div>
+    </section>
 
-            <form id="medication-form" onsubmit="handleMedicationSubmit(event)" class="mt-4 space-y-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Associated Illness *</label>
-                    <select id="med-episodeId" required class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold">
-                        <!-- Dynamic Options -->
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Medication / Treatment Name *</label>
-                        <input type="text" id="med-name" required placeholder="e.g., Amoxicillin, Ibuprofen, Saline Spray" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Dosage *</label>
-                        <input type="text" id="med-dosage" required placeholder="e.g., 500mg, 2 puffs, 10ml" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Frequency</label>
-                        <input type="text" id="med-frequency" placeholder="e.g., Twice Daily, Every 6 Hrs, As Needed" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Prescribing Doctor / OTC</label>
-                        <input type="text" id="med-doctor" placeholder="e.g., Urgent Care Dr. Miller / OTC" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Instructions / Notes</label>
-                    <input type="text" id="med-timing" placeholder="e.g., Take with full glass of water after food for 10 days" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500">
-                </div>
-
-                <div class="flex justify-end gap-3 pt-3 border-t border-slate-100">
-                    <button type="button" onclick="closeMedicationModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
-                    <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-md shadow-brand-500/20">Save Treatment</button>
-                </div>
-            </form>
+    <!-- LOGS TAB -->
+    <section id="tab-logs" class="tab-content hidden space-y-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Symptom & Vital Logs</h2>
+          <p class="text-slate-500 text-sm">Real-time fever or symptom updates synchronized across devices.</p>
         </div>
-    </div>
+        <button onclick="openNewLogModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium shadow-sm transition flex items-center gap-2">
+          <i class="fa-solid fa-plus"></i> Add Log Entry
+        </button>
+      </div>
 
-    <!-- APPOINTMENT MODAL -->
-    <div id="appointment-modal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-8">
-            <div class="flex justify-between items-center pb-4 border-b border-slate-100">
-                <h3 class="font-bold text-lg text-slate-900 flex items-center gap-2">
-                    <i class="fa-solid fa-user-doctor text-emerald-600"></i>
-                    Log Doctor Visit / Urgent Care
-                </h3>
-                <button onclick="closeAppointmentModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-
-            <form id="appointment-form" onsubmit="handleAppointmentSubmit(event)" class="mt-4 space-y-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Doctor / Medical Facility *</label>
-                    <input type="text" id="app-doctor" required placeholder="e.g., Urgent Care - Dr. Miller, Dr. Evans (Primary)" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Visit Date *</label>
-                        <input type="date" id="app-date" required class="w-full text-sm px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Time</label>
-                        <input type="time" id="app-time" class="w-full text-sm px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Reason for Visit</label>
-                    <input type="text" id="app-reason" placeholder="e.g., High fever persists 4 days, severe sore throat" class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Visit Outcome / Notes</label>
-                    <textarea id="app-notes" rows="2" placeholder="e.g., Flu test negative, diagnosed with bacterial sinus infection. Prescribed Amoxicillin." class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
-                </div>
-
-                <div class="flex justify-end gap-3 pt-3 border-t border-slate-100">
-                    <button type="button" onclick="closeAppointmentModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
-                    <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-500/20">Save Visit Log</button>
-                </div>
-            </form>
+      <div class="glass-card rounded-2xl p-4 shadow-sm border border-slate-200">
+        <div id="logs-timeline" class="space-y-4">
+          <!-- Dynamically rendered -->
         </div>
-    </div>
+      </div>
+    </section>
 
-    <!-- GOOGLE SHEETS / CSV IMPORT MODAL -->
-    <div id="import-modal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 my-8 space-y-5">
-            <div class="flex justify-between items-center pb-4 border-b border-slate-100">
-                <div class="flex items-center gap-2">
-                    <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                        <i class="fa-solid fa-file-excel text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-lg text-slate-900">Import Past Sicknesses from Google Sheets</h3>
-                        <p class="text-xs text-slate-500">Bulk upload your historical illness logs via link, file download, or copy-paste</p>
-                    </div>
-                </div>
-                <button onclick="closeImportModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-
-            <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-bold gap-1">
-                <button id="import-tab-url" onclick="switchImportMethod('url')" class="flex-1 py-2 rounded-lg bg-white shadow-sm text-indigo-700 transition-all">
-                    <i class="fa-solid fa-link mr-1"></i> Google Sheet URL
-                </button>
-                <button id="import-tab-file" onclick="switchImportMethod('file')" class="flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all">
-                    <i class="fa-solid fa-file-csv mr-1"></i> Upload CSV File
-                </button>
-                <button id="import-tab-paste" onclick="switchImportMethod('paste')" class="flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all">
-                    <i class="fa-solid fa-paste mr-1"></i> Copy & Paste Data
-                </button>
-            </div>
-
-            <div id="import-method-url" class="space-y-3">
-                <p class="text-xs text-slate-600">Enter a public Google Sheets share link or CSV export URL:</p>
-                <div class="flex gap-2">
-                    <input type="text" id="import-gsheet-url" placeholder="https://docs.google.com/spreadsheets/d/your-sheet-id/edit..." class="flex-1 text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <button onclick="handleGoogleSheetUrlImport()" id="btn-fetch-gsheet" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition-all shadow flex items-center gap-1.5 shrink-0">
-                        <i class="fa-solid fa-cloud-arrow-down"></i>
-                        <span>Fetch & Parse Sheet</span>
-                    </button>
-                </div>
-            </div>
-
-            <div id="import-method-file" class="hidden space-y-3">
-                <p class="text-xs text-slate-600">Download your Google Sheet as CSV then select or drag it here:</p>
-                <label class="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50 hover:bg-indigo-50/30">
-                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-indigo-500 mb-2"></i>
-                    <span class="text-xs font-bold text-slate-700">Click to browse or drop CSV file here</span>
-                    <input type="file" id="import-csv-file-input" accept=".csv, .tsv, .txt" onchange="handleFileUploadImport(event)" class="hidden">
-                </label>
-            </div>
-
-            <div id="import-method-paste" class="hidden space-y-3">
-                <p class="text-xs text-slate-600">Copy cells from Google Sheets and paste them below:</p>
-                <textarea id="import-paste-textarea" rows="5" placeholder="Title&#11088;Category&#11088;Start Date&#11088;End Date&#11088;Status&#11088;Primary Symptoms&#11088;Notes" class="w-full text-xs font-mono p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-                <div class="flex justify-end">
-                    <button onclick="handleRawTextImport()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow flex items-center gap-1.5">
-                        <i class="fa-solid fa-gear"></i> Parse Pasted Text
-                    </button>
-                </div>
-            </div>
-
-            <div id="import-preview-container" class="hidden space-y-3 border-t border-slate-100 pt-3">
-                <div class="flex justify-between items-center">
-                    <h4 class="font-bold text-sm text-slate-900 flex items-center gap-2">
-                        <i class="fa-solid fa-list-check text-emerald-600"></i>
-                        Parsed Illness Episodes Preview (<span id="import-preview-count">0</span>)
-                    </h4>
-                </div>
-                <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-xl bg-white">
-                    <table class="w-full text-left text-xs">
-                        <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0">
-                            <tr>
-                                <th class="p-2">Title</th>
-                                <th class="p-2">Category</th>
-                                <th class="p-2">Start Date</th>
-                                <th class="p-2">Status</th>
-                                <th class="p-2">Symptoms</th>
-                            </tr>
-                        </thead>
-                        <tbody id="import-preview-tbody" class="divide-y divide-slate-100"></tbody>
-                    </table>
-                </div>
-
-                <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" onclick="closeImportModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
-                    <button type="button" onclick="confirmAndSaveImport()" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md flex items-center gap-1.5">
-                        <i class="fa-solid fa-file-circle-plus"></i> Import <span id="import-btn-count">0</span> Sickness Episodes
-                    </button>
-                </div>
-            </div>
+    <!-- MEDS TAB -->
+    <section id="tab-meds" class="tab-content hidden space-y-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Treatments & Medications</h2>
+          <p class="text-slate-500 text-sm">Doses taken across any device automatically update here.</p>
         </div>
+        <button onclick="openNewMedModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium shadow-sm transition flex items-center gap-2">
+          <i class="fa-solid fa-plus"></i> Log Treatment
+        </button>
+      </div>
+
+      <div id="meds-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Dynamically rendered -->
+      </div>
+    </section>
+
+    <!-- IMPORT TAB -->
+    <section id="tab-import" class="tab-content hidden space-y-6">
+      <div>
+        <h2 class="text-2xl font-bold text-slate-900">Import Google Sheets / CSV</h2>
+        <p class="text-slate-500 text-sm">Import past sicknesses from Google Sheets to sync with both phones.</p>
+      </div>
+
+      <div class="glass-card p-6 rounded-2xl border border-slate-200 max-w-2xl space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Paste Google Sheet CSV or Raw Text Data</label>
+          <textarea id="csv-import-text" rows="6" placeholder="Title,Category,StartDate,EndDate,Status,Symptoms&#10;Winter Flu,Respiratory,2026-01-10,2026-01-16,Resolved,Fever 101.4, Cough, Body aches" class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+        </div>
+        <button onclick="processCsvImport()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-medium transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-file-import"></i> Parse & Cloud Sync History
+        </button>
+      </div>
+    </section>
+
+    <!-- DOCTOR SUMMARY TAB -->
+    <section id="tab-summary" class="tab-content hidden space-y-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Doctor Episode Report</h2>
+          <p class="text-slate-500 text-sm">History of Present Illness (HPI) compiled live from your phone logs.</p>
+        </div>
+        <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-medium shadow-sm transition flex items-center gap-2">
+          <i class="fa-solid fa-print"></i> Print Report
+        </button>
+      </div>
+
+      <div id="summary-report-card" class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+        <!-- Dynamically rendered -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- PAIRING MODAL -->
+  <div id="pairing-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-6">
+      <div class="flex justify-between items-center">
+        <h3 class="text-lg font-bold text-slate-900">Real-Time Cloud Pairing Code</h3>
+        <button onclick="closePairingModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <div class="space-y-4">
+        <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-center">
+          <p class="text-xs text-indigo-700 font-semibold uppercase tracking-wider mb-1">Your Device Sync Code</p>
+          <div id="sync-key-display" class="text-2xl font-mono font-bold text-indigo-950 tracking-widest my-1">CARE-9876</div>
+          <button onclick="copySyncKey()" class="text-xs text-indigo-600 hover:underline font-medium"><i class="fa-regular fa-copy"></i> Copy Code</button>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Connect Galaxy S23+ / Pixel 10 Pro to Same Code</label>
+          <div class="flex gap-2">
+            <input type="text" id="sync-key-input" placeholder="e.g. CARE-1234" class="flex-1 p-2.5 border border-slate-300 rounded-xl font-mono text-sm uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <button onclick="connectCustomSyncKey()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition">Sync Now</button>
+          </div>
+        </div>
+
+        <div class="flex justify-center pt-2">
+          <div id="qrcode-container" class="p-2 bg-white border border-slate-200 rounded-xl"></div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <script>
-        // Helper Functions (Hoisted)
-        function getRelativeDate(offsetDays) {
-            const d = new Date();
-            d.setDate(d.getDate() + offsetDays);
-            return d.toISOString().split('T')[0];
+  <script>
+    let currentSyncKey = localStorage.getItem('carepulse_firestore_key') || 'CARE-' + Math.floor(1000 + Math.random() * 9000);
+    localStorage.setItem('carepulse_firestore_key', currentSyncKey);
+
+    let careData = {
+      episodes: [
+        { id: 'ep-1', title: 'Winter Flu / Fever', category: 'Respiratory', startDate: '2026-02-01', endDate: '', status: 'Active', symptoms: 'Fever 101.4 F, Body aches, Cough', notes: 'Logged from phone.' }
+      ],
+      logs: [
+        { id: 'log-1', episodeId: 'ep-1', date: '2026-02-01 14:00', symptom: 'Fever', severity: '8', notes: 'Spiked to 101.4 F' }
+      ],
+      meds: [
+        { id: 'med-1', episodeId: 'ep-1', name: 'Ibuprofen', dose: '400mg', timeTaken: '2026-02-01 14:30', notes: 'Taken with water' }
+      ]
+    };
+
+    let unsubscribeSnapshot = null;
+
+    window.addEventListener('firebase-ready', () => {
+      connectFirestoreSync();
+    });
+
+    function connectFirestoreSync() {
+      if (!window.FirebaseDB) return;
+
+      const docRef = window.doc(window.FirebaseDB, "sickness_sync", currentSyncKey);
+
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+
+      unsubscribeSnapshot = window.onSnapshot(docRef, (snapshot) => {
+        if (snapshot.exists()) {
+          careData = snapshot.data();
+          renderAll();
+          updateSyncStatus(true, 'Auto-Synced');
+        } else {
+          pushToCloud();
         }
+      }, (error) => {
+        console.warn("Firestore listener fallback to local:", error);
+        updateSyncStatus(true, 'Local Backup');
+      });
+    }
 
-        function formatDateNice(dateStr) {
-            if (!dateStr) return '';
-            const parts = dateStr.split('-');
-            if (parts.length !== 3) return dateStr;
-            const date = new Date(parts[0], parts[1] - 1, parts[2]);
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    function pushToCloud() {
+      localStorage.setItem('carepulse_local_' + currentSyncKey, JSON.stringify(careData));
+      
+      if (window.FirebaseDB) {
+        const docRef = window.doc(window.FirebaseDB, "sickness_sync", currentSyncKey);
+        window.setDoc(docRef, careData)
+          .then(() => updateSyncStatus(true, 'Auto-Synced'))
+          .catch(() => updateSyncStatus(true, 'Local Offline'));
+      }
+      renderAll();
+    }
+
+    function updateSyncStatus(active, label) {
+      const dot = document.getElementById('sync-status-indicator');
+      const text = document.getElementById('sync-status-text');
+      if (active) {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+        text.innerText = `${label} (${currentSyncKey})`;
+      } else {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+        text.innerText = 'Connecting...';
+      }
+    }
+
+    function renderAll() {
+      renderEpisodes();
+      renderLogs();
+      renderMeds();
+      renderSummary();
+    }
+
+    function renderEpisodes() {
+      const container = document.getElementById('episodes-list');
+      if (!careData.episodes || careData.episodes.length === 0) {
+        container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400"><i class="fa-solid fa-notes-medical text-4xl mb-2"></i><p>No sickness episodes logged yet.</p></div>`;
+        return;
+      }
+      container.innerHTML = careData.episodes.map(ep => `
+        <div class="glass-card rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+          <div>
+            <div class="flex justify-between items-start mb-2">
+              <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${ep.status === 'Active' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}">${ep.status}</span>
+              <span class="text-xs text-slate-400"><i class="fa-regular fa-calendar"></i> ${ep.startDate}</span>
+            </div>
+            <h3 class="font-bold text-lg text-slate-900">${ep.title}</h3>
+            <p class="text-xs text-indigo-600 font-medium mb-2">${ep.category}</p>
+            <p class="text-sm text-slate-600 line-clamp-2">${ep.symptoms}</p>
+          </div>
+          <div class="pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
+            <span>${ep.notes || 'No extra notes'}</span>
+            <button onclick="deleteEpisode('${ep.id}')" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderLogs() {
+      const container = document.getElementById('logs-timeline');
+      if (!careData.logs || careData.logs.length === 0) {
+        container.innerHTML = `<p class="text-center text-slate-400 py-6">No symptom entries logged.</p>`;
+        return;
+      }
+      container.innerHTML = careData.logs.map(log => `
+        <div class="flex items-start gap-4 p-3 rounded-xl hover:bg-slate-50 transition border border-slate-100">
+          <div class="bg-indigo-100 text-indigo-700 p-2.5 rounded-xl font-bold text-sm text-center min-w-[50px]">
+            ${log.severity}/10
+          </div>
+          <div class="flex-1">
+            <div class="flex justify-between items-center">
+              <h4 class="font-bold text-slate-800 text-sm">${log.symptom}</h4>
+              <span class="text-xs text-slate-400">${log.date}</span>
+            </div>
+            <p class="text-xs text-slate-600 mt-1">${log.notes || ''}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderMeds() {
+      const container = document.getElementById('meds-list');
+      if (!careData.meds || careData.meds.length === 0) {
+        container.innerHTML = `<p class="col-span-full text-center text-slate-400 py-6">No treatments or medications recorded.</p>`;
+        return;
+      }
+      container.innerHTML = careData.meds.map(m => `
+        <div class="glass-card p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <div class="bg-emerald-100 text-emerald-700 p-3 rounded-xl"><i class="fa-solid fa-pills text-lg"></i></div>
+            <div>
+              <h4 class="font-bold text-slate-900 text-sm">${m.name} (${m.dose})</h4>
+              <p class="text-xs text-slate-500">${m.timeTaken} • ${m.notes || ''}</p>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderSummary() {
+      const card = document.getElementById('summary-report-card');
+      const activeEp = (careData.episodes && careData.episodes[0]) ? careData.episodes[0] : { title: 'None', symptoms: 'N/A', startDate: 'N/A' };
+      card.innerHTML = `
+        <div class="border-b border-slate-200 pb-4 flex justify-between items-start">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900">Medical History Briefing</h2>
+            <p class="text-xs text-slate-500">CarePulse Cloud Incident Report</p>
+          </div>
+          <span class="text-xs text-slate-400">${new Date().toLocaleDateString()}</span>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-1">Primary Active Episode</h3>
+          <p class="text-base font-semibold text-indigo-900">${activeEp.title}</p>
+          <p class="text-xs text-slate-500">Onset Date: ${activeEp.startDate}</p>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-1">Reported Symptoms</h3>
+          <p class="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">${activeEp.symptoms}</p>
+        </div>
+      `;
+    }
+
+    function deleteEpisode(id) {
+      careData.episodes = careData.episodes.filter(e => e.id !== id);
+      pushToCloud();
+    }
+
+    function processCsvImport() {
+      const text = document.getElementById('csv-import-text').value.trim();
+      if (!text) return alert("Please paste spreadsheet text or CSV data first.");
+
+      const lines = text.split('\n');
+      const newEpisodes = [];
+
+      lines.forEach((line, idx) => {
+        if (idx === 0 && line.toLowerCase().includes('title')) return;
+        const cols = line.split(',');
+        if (cols.length >= 3) {
+          newEpisodes.push({
+            id: 'ep-' + Date.now() + '-' + idx,
+            title: cols[0]?.trim() || 'Imported Sickness',
+            category: cols[1]?.trim() || 'General Illness',
+            startDate: cols[2]?.trim() || new Date().toISOString().split('T')[0],
+            endDate: cols[3]?.trim() || '',
+            status: cols[4]?.trim() || 'Resolved',
+            symptoms: cols[5]?.trim() || 'Imported record',
+            notes: 'Imported from Google Sheets'
+          });
         }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str)
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
-        function getSeverityBadge(sev) {
-            const s = Number(sev);
-            if (s <= 3) return `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">Mild (${s}/10)</span>`;
-            if (s <= 6) return `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800">Moderate (${s}/10)</span>`;
-            if (s <= 8) return `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-orange-100 text-orange-800">Severe (${s}/10)</span>`;
-            return `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 animate-pulse">Extreme (${s}/10)</span>`;
-        }
-
-        function showToast(msg, type = 'success') {
-            const container = document.getElementById('toast-container');
-            if (!container) return;
-            const toast = document.createElement('div');
-            toast.className = `px-4 py-3 rounded-xl shadow-lg text-white text-sm font-semibold flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto ${
-                type === 'error' ? 'bg-rose-600' : (type === 'info' ? 'bg-indigo-600' : 'bg-slate-900')
-            }`;
-            toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-circle-exclamation' : (type === 'info' ? 'fa-mobile-screen-button' : 'fa-circle-check')} text-teal-400"></i> ${escapeHtml(msg)}`;
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.classList.remove('translate-y-2', 'opacity-0');
-            }, 10);
-            setTimeout(() => {
-                toast.classList.add('opacity-0');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        // Mock Default State
-        const defaultState = {
-            episodes: [
-                {
-                    id: 'ep-1',
-                    title: 'Acute Sinus & Respiratory Infection',
-                    category: 'Viral / Respiratory (Flu, Cold, Covid)',
-                    status: 'Active',
-                    startDate: getRelativeDate(-4),
-                    endDate: null,
-                    primarySymptoms: 'Fever 101.4°F, Sinus Pressure, Congestion, Body Aches',
-                    notes: 'Diagnosed at Urgent Care. Prescribed 10-day Amoxicillin course.'
-                },
-                {
-                    id: 'ep-2',
-                    title: 'Severe Migraine Episode',
-                    category: 'Neurological / Migraine',
-                    status: 'Resolved',
-                    startDate: getRelativeDate(-12),
-                    endDate: getRelativeDate(-11),
-                    primarySymptoms: 'Throbbing right-side headache, Sensitivity to light',
-                    notes: 'Resolved after Sumatriptan dose and resting in dark room.'
-                }
-            ],
-            symptoms: [
-                {
-                    id: 'sym-1',
-                    episodeId: 'ep-1',
-                    name: 'High Fever & Chills',
-                    category: 'Body & Systemic (Fever/Chills)',
-                    severity: 8,
-                    date: getRelativeDate(-4),
-                    time: '18:00',
-                    notes: 'Temp reached 101.4°F. Took Acetaminophen.'
-                }
-            ],
-            medications: [
-                {
-                    id: 'med-1',
-                    episodeId: 'ep-1',
-                    name: 'Amoxicillin',
-                    dosage: '500mg',
-                    frequency: 'Twice Daily',
-                    timing: 'With morning & evening meals',
-                    doctor: 'Urgent Care Dr. Miller',
-                    takenToday: true
-                }
-            ],
-            appointments: [
-                {
-                    id: 'app-1',
-                    doctor: 'Urgent Care - Dr. Miller',
-                    date: getRelativeDate(-4),
-                    time: '16:30',
-                    reason: 'High fever and severe sinus pressure',
-                    notes: 'Confirmed acute infection. Follow up if fever persists past 5 days.'
-                }
-            ]
-        };
-
-        window.appData = loadState();
-
-        function loadState() {
-            try {
-                const saved = localStorage.getItem('carepulse_sickness_data');
-                if (saved) return JSON.parse(saved);
-            } catch (e) {
-                console.error('Error loading state:', e);
-            }
-            return JSON.parse(JSON.stringify(defaultState));
-        }
-
-        function saveState(shouldPushCloud = true) {
-            try {
-                localStorage.setItem('carepulse_sickness_data', JSON.stringify(window.appData));
-                if (shouldPushCloud && window.CarePulseCloud) {
-                    window.CarePulseCloud.pushState(window.appData);
-                }
-            } catch (e) {
-                console.error('Error saving state:', e);
-            }
-        }
-
-        function resetDataConfirmation() {
-            if (confirm('Reset application data to original sample illness logs?')) {
-                window.appData = JSON.parse(JSON.stringify(defaultState));
-                saveState();
-                initApp();
-                showToast('Reset to sample sickness logs!');
-            }
-        }
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            const activeTab = document.getElementById('tab-' + tabId);
-            if (activeTab) activeTab.classList.remove('hidden');
-
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.className = 'nav-btn px-3.5 py-2 rounded-lg text-slate-300 hover:text-white transition-all font-medium';
-            });
-            const activeNav = document.getElementById('nav-' + tabId);
-            if (activeNav) {
-                activeNav.className = 'nav-btn px-3.5 py-2 rounded-lg transition-all text-rose-400 bg-slate-900 shadow-sm font-semibold';
-            }
-
-            document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
-                btn.className = 'mobile-nav-btn p-1.5 text-slate-400 flex flex-col items-center';
-            });
-            const activeMobile = document.getElementById('mobile-nav-' + tabId);
-            if (activeMobile) {
-                activeMobile.className = 'mobile-nav-btn p-1.5 text-rose-400 font-semibold flex flex-col items-center';
-            }
-
-            if (tabId === 'dashboard') renderDashboard();
-            if (tabId === 'symptoms') renderSymptoms();
-            if (tabId === 'medications') renderMedications();
-            if (tabId === 'appointments') renderAppointments();
-            if (tabId === 'analytics') renderAnalytics();
-            if (tabId === 'report') renderReport();
-        }
-
-        function renderDashboard() {
-            const activeEp = window.appData.episodes.filter(e => e.status === 'Active');
-            document.getElementById('stat-active-episodes-count').innerText = activeEp.length;
-            document.getElementById('stat-active-status').innerText = activeEp.length > 0 ? `${activeEp.length} active sickness logged` : 'No active sickness';
-
-            let totalDays = 0;
-            window.appData.episodes.forEach(e => {
-                const start = new Date(e.startDate);
-                const end = e.endDate ? new Date(e.endDate) : new Date();
-                const diffTime = Math.abs(end - start);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
-                totalDays += diffDays;
-            });
-            document.getElementById('stat-sick-days').innerText = totalDays;
-
-            document.getElementById('stat-total-symptom-entries').innerText = window.appData.symptoms.length;
-            const avgSev = window.appData.symptoms.length > 0 
-                ? (window.appData.symptoms.reduce((a, b) => a + Number(b.severity), 0) / window.appData.symptoms.length).toFixed(1)
-                : '0.0';
-            document.getElementById('stat-symptom-avg-severity').innerText = `Avg severity: ${avgSev} / 10`;
-
-            const todayStr = new Date().toISOString().split('T')[0];
-            const upcoming = window.appData.appointments
-                .filter(a => a.date >= todayStr)
-                .sort((a,b) => new Date(a.date) - new Date(b.date))[0];
-
-            if (upcoming) {
-                document.getElementById('stat-next-appointment-date').innerText = formatDateNice(upcoming.date);
-                document.getElementById('stat-next-appointment-doctor').innerText = upcoming.doctor;
-            } else {
-                document.getElementById('stat-next-appointment-date').innerText = 'None scheduled';
-                document.getElementById('stat-next-appointment-doctor').innerText = 'Click Visits to schedule';
-            }
-
-            renderEpisodesList();
-            renderQuickTrendChart();
-        }
-
-        function renderEpisodesList() {
-            const container = document.getElementById('dashboard-episodes-container');
-            if (window.appData.episodes.length === 0) {
-                container.innerHTML = `
-                    <div class="p-8 text-center bg-white rounded-2xl border border-slate-200">
-                        <i class="fa-solid fa-virus-slash text-3xl text-slate-300 mb-2"></i>
-                        <p class="text-sm font-semibold text-slate-600">No sickness episodes logged</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const sorted = [...window.appData.episodes].sort((a, b) => {
-                if (a.status === 'Active' && b.status !== 'Active') return -1;
-                if (a.status !== 'Active' && b.status === 'Active') return 1;
-                return new Date(b.startDate) - new Date(a.startDate);
-            });
-
-            container.innerHTML = sorted.map(ep => {
-                const epSymptoms = window.appData.symptoms.filter(s => s.episodeId === ep.id);
-                const epMeds = window.appData.medications.filter(m => m.episodeId === ep.id);
-
-                return `
-                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4 ${ep.status === 'Active' ? 'border-l-4 border-l-rose-500' : ''}">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <h3 class="font-bold text-lg text-slate-900">${escapeHtml(ep.title)}</h3>
-                                    <span class="text-xs font-bold px-2.5 py-0.5 rounded-full ${ep.status === 'Active' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
-                                        ${ep.status === 'Active' ? '🔴 Active Illness' : '🟢 Resolved'}
-                                    </span>
-                                </div>
-                                <p class="text-xs text-slate-500 mt-1">
-                                    <i class="fa-regular fa-calendar mr-1"></i> Started: ${formatDateNice(ep.startDate)} 
-                                    ${ep.endDate ? ` &bull; Resolved: ${formatDateNice(ep.endDate)}` : ''}
-                                    &bull; Category: ${escapeHtml(ep.category)}
-                                </p>
-                            </div>
-
-                            <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                                <button onclick="openAiInsightsForEpisode('${ep.id}')" class="text-xs font-bold px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl transition-all flex items-center gap-1.5 shadow-sm">
-                                    <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i> AI Insights
-                                </button>
-                                ${ep.status === 'Active' ? `
-                                    <button onclick="markEpisodeResolved('${ep.id}')" class="text-xs font-semibold px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl transition-colors">
-                                        <i class="fa-solid fa-check mr-1"></i> Mark Resolved
-                                    </button>
-                                ` : ''}
-                                <button onclick="deleteEpisode('${ep.id}')" class="text-xs text-slate-400 hover:text-rose-600 p-1.5" title="Delete Episode">
-                                    <i class="fa-solid fa-trash-can"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        ${ep.primarySymptoms ? `
-                            <div>
-                                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Primary Symptoms</span>
-                                <p class="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">${escapeHtml(ep.primarySymptoms)}</p>
-                            </div>
-                        ` : ''}
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-1">
-                            <div class="bg-slate-50/70 p-3 rounded-xl border border-slate-100 space-y-2">
-                                <div class="flex justify-between items-center">
-                                    <span class="font-bold text-slate-800"><i class="fa-solid fa-notes-medical text-rose-500 mr-1"></i> Symptom Readings (${epSymptoms.length})</span>
-                                    <button onclick="openSymptomModal('${ep.id}')" class="text-[11px] text-rose-600 hover:underline font-semibold">+ Add Entry</button>
-                                </div>
-                                ${epSymptoms.length === 0 ? '<p class="text-slate-400 italic">No specific symptom entries logged.</p>' : ''}
-                                <div class="space-y-1.5">
-                                    ${epSymptoms.map(s => `
-                                        <div class="p-2 bg-white rounded-lg border border-slate-200 flex justify-between items-center">
-                                            <div>
-                                                <span class="font-semibold text-slate-900">${escapeHtml(s.name)}</span>
-                                                <span class="text-[10px] text-slate-500 block">${formatDateNice(s.date)} ${s.time ? 'at ' + s.time : ''}</span>
-                                            </div>
-                                            ${getSeverityBadge(s.severity)}
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-
-                            <div class="bg-slate-50/70 p-3 rounded-xl border border-slate-100 space-y-2">
-                                <div class="flex justify-between items-center">
-                                    <span class="font-bold text-slate-800"><i class="fa-solid fa-pills text-brand-600 mr-1"></i> Treatments & Meds (${epMeds.length})</span>
-                                    <button onclick="openMedicationModal('${ep.id}')" class="text-[11px] text-brand-600 hover:underline font-semibold">+ Add Treatment</button>
-                                </div>
-                                ${epMeds.length === 0 ? '<p class="text-slate-400 italic">No treatments recorded.</p>' : ''}
-                                <div class="space-y-1.5">
-                                    ${epMeds.map(m => `
-                                        <div class="p-2 bg-white rounded-lg border border-slate-200 flex justify-between items-center">
-                                            <div>
-                                                <span class="font-semibold text-slate-900">${escapeHtml(m.name)}</span>
-                                                <span class="text-[10px] text-slate-500 block">${escapeHtml(m.dosage)} &bull; ${escapeHtml(m.frequency)}</span>
-                                            </div>
-                                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-brand-50 text-brand-700">Rx / Dose</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function renderSymptoms() {
-            const container = document.getElementById('symptoms-list-container');
-            const search = document.getElementById('symptom-search').value.toLowerCase();
-            const filterEp = document.getElementById('symptom-filter-episode').value;
-
-            const selectFilter = document.getElementById('symptom-filter-episode');
-            selectFilter.innerHTML = '<option value="ALL">All Illness Episodes</option>' + 
-                window.appData.episodes.map(e => `<option value="${e.id}">${escapeHtml(e.title)}</option>`).join('');
-            selectFilter.value = filterEp;
-
-            let filtered = window.appData.symptoms.filter(s => {
-                const matchesSearch = s.name.toLowerCase().includes(search) || (s.notes && s.notes.toLowerCase().includes(search));
-                const matchesEp = filterEp === 'ALL' || s.episodeId === filterEp;
-                return matchesSearch && matchesEp;
-            });
-
-            if (filtered.length === 0) {
-                container.innerHTML = `<div class="col-span-full p-8 text-center bg-white rounded-2xl border border-slate-200"><p class="text-sm font-semibold text-slate-600">No symptom logs found</p></div>`;
-                return;
-            }
-
-            container.innerHTML = filtered.map(s => {
-                const ep = window.appData.episodes.find(e => e.id === s.episodeId);
-                return `
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3 flex flex-col justify-between">
-                        <div>
-                            <div class="flex justify-between items-start gap-2">
-                                <div>
-                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">${escapeHtml(ep ? ep.title : 'General Illness')}</span>
-                                    <h3 class="font-bold text-slate-900">${escapeHtml(s.name)}</h3>
-                                </div>
-                                ${getSeverityBadge(s.severity)}
-                            </div>
-                            <p class="text-xs text-slate-500 mt-2">
-                                <i class="fa-regular fa-clock mr-1"></i> ${formatDateNice(s.date)} ${s.time ? 'at ' + s.time : ''}
-                                &bull; <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-semibold">${escapeHtml(s.category)}</span>
-                            </p>
-                            ${s.notes ? `<p class="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mt-3">${escapeHtml(s.notes)}</p>` : ''}
-                        </div>
-                        <div class="flex justify-end pt-2 border-t border-slate-100">
-                            <button onclick="deleteSymptom('${s.id}')" class="text-xs text-slate-400 hover:text-rose-600">
-                                <i class="fa-solid fa-trash-can mr-1"></i> Delete Log
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function renderMedications() {
-            const container = document.getElementById('medications-list-container');
-            if (window.appData.medications.length === 0) {
-                container.innerHTML = `<div class="col-span-full p-8 text-center bg-white rounded-2xl border border-slate-200"><p class="text-sm font-semibold text-slate-600">No treatments recorded</p></div>`;
-                return;
-            }
-
-            container.innerHTML = window.appData.medications.map(m => {
-                const ep = window.appData.episodes.find(e => e.id === m.episodeId);
-                return `
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3 flex flex-col justify-between">
-                        <div>
-                            <div class="flex justify-between items-start gap-2">
-                                <div>
-                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">${escapeHtml(ep ? ep.title : 'General Treatment')}</span>
-                                    <h3 class="font-bold text-slate-900">${escapeHtml(m.name)}</h3>
-                                </div>
-                                <span class="text-xs font-bold px-2 py-0.5 rounded bg-brand-50 text-brand-700">${escapeHtml(m.dosage)}</span>
-                            </div>
-                            <div class="text-xs text-slate-600 space-y-1 mt-2">
-                                <p><i class="fa-regular fa-clock text-slate-400 w-4"></i> <strong>Frequency:</strong> ${escapeHtml(m.frequency)}</p>
-                                ${m.doctor ? `<p><i class="fa-solid fa-user-doctor text-slate-400 w-4"></i> <strong>Prescriber:</strong> ${escapeHtml(m.doctor)}</p>` : ''}
-                            </div>
-                        </div>
-                        <div class="flex items-center justify-between pt-3 border-t border-slate-100">
-                            <button onclick="toggleMedTaken('${m.id}')" class="text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors ${m.takenToday ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
-                                <i class="fa-solid ${m.takenToday ? 'fa-check-circle' : 'fa-circle'} mr-1"></i>
-                                ${m.takenToday ? 'Dose Taken Today' : 'Mark Taken Today'}
-                            </button>
-                            <button onclick="deleteMedication('${m.id}')" class="text-xs text-slate-400 hover:text-rose-600 p-1">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function renderAppointments() {
-            const container = document.getElementById('appointments-list-container');
-            if (window.appData.appointments.length === 0) {
-                container.innerHTML = `<div class="p-8 text-center bg-white rounded-2xl border border-slate-200"><p class="text-sm font-semibold text-slate-600">No visits recorded</p></div>`;
-                return;
-            }
-
-            container.innerHTML = window.appData.appointments.map(a => `
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-                    <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-                        <div>
-                            <h3 class="font-bold text-slate-900">${escapeHtml(a.doctor)}</h3>
-                            <p class="text-xs text-slate-500"><i class="fa-regular fa-calendar mr-1"></i> ${formatDateNice(a.date)} ${a.time ? 'at ' + a.time : ''}</p>
-                        </div>
-                        <button onclick="deleteAppointment('${a.id}')" class="text-xs text-slate-400 hover:text-rose-600">
-                            <i class="fa-solid fa-trash-can mr-1"></i> Delete
-                        </button>
-                    </div>
-                    ${a.reason ? `<p class="text-xs text-slate-700"><strong>Reason:</strong> ${escapeHtml(a.reason)}</p>` : ''}
-                </div>
-            `).join('');
-        }
-
-        function renderReport() {
-            const select = document.getElementById('report-episode-select');
-            select.innerHTML = window.appData.episodes.map(e => `<option value="${e.id}">${escapeHtml(e.title)} (${formatDateNice(e.startDate)})</option>`).join('');
-
-            if (window.appData.episodes.length === 0) {
-                document.getElementById('printable-report-container').innerHTML = `<p class="text-slate-500 italic text-center">No illness episodes available to report.</p>`;
-                return;
-            }
-
-            const currentEpId = select.value || window.appData.episodes[0].id;
-            const ep = window.appData.episodes.find(e => e.id === currentEpId);
-            const epSymptoms = window.appData.symptoms.filter(s => s.episodeId === ep.id);
-            const epMeds = window.appData.medications.filter(m => m.episodeId === ep.id);
-
-            document.getElementById('printable-report-container').innerHTML = `
-                <div class="flex justify-between items-center border-b border-slate-200 pb-4">
-                    <div>
-                        <h1 class="text-2xl font-bold text-slate-900">Medical Sickness Incident Summary</h1>
-                        <p class="text-xs text-slate-500">Generated via CarePulse Tracker &bull; ${new Date().toLocaleDateString()}</p>
-                    </div>
-                    <span class="text-xs font-bold px-3 py-1 rounded-full ${ep.status === 'Active' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
-                        ${ep.status === 'Active' ? 'Active Sickness' : 'Resolved Episode'}
-                    </span>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <div>
-                        <p class="text-slate-500 font-bold uppercase">Episode Title</p>
-                        <p class="font-bold text-slate-900 text-sm">${escapeHtml(ep.title)}</p>
-                    </div>
-                    <div>
-                        <p class="text-slate-500 font-bold uppercase">Category</p>
-                        <p class="font-bold text-slate-900 text-sm">${escapeHtml(ep.category)}</p>
-                    </div>
-                </div>
-
-                <div>
-                    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">Logged Symptom Progression</h3>
-                    <table class="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
-                        <thead class="bg-slate-100 text-slate-700 font-bold">
-                            <tr>
-                                <th class="p-2.5">Date & Time</th>
-                                <th class="p-2.5">Symptom</th>
-                                <th class="p-2.5">Severity</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200">
-                            ${epSymptoms.map(s => `
-                                <tr>
-                                    <td class="p-2.5 text-slate-600 font-medium">${formatDateNice(s.date)} ${s.time || ''}</td>
-                                    <td class="p-2.5 font-bold text-slate-900">${escapeHtml(s.name)}</td>
-                                    <td class="p-2.5">${getSeverityBadge(s.severity)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        }
-
-        let quickChartInstance = null;
-        let categoryChartInstance = null;
-        let severityChartInstance = null;
-
-        function renderQuickTrendChart() {
-            const ctx = document.getElementById('quick-trend-chart');
-            if (!ctx) return;
-            if (quickChartInstance) quickChartInstance.destroy();
-
-            const sortedSymptoms = [...window.appData.symptoms].sort((a,b) => new Date(a.date) - new Date(b.date));
-            const labels = sortedSymptoms.slice(-7).map(s => formatDateNice(s.date));
-            const data = sortedSymptoms.slice(-7).map(s => s.severity);
-
-            quickChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels.length > 0 ? labels : ['No Data'],
-                    datasets: [{
-                        label: 'Severity (1-10)',
-                        data: data.length > 0 ? data : [0],
-                        borderColor: '#e11d48',
-                        backgroundColor: 'rgba(225, 29, 72, 0.1)',
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-        }
-
-        function renderAnalytics() {
-            const ctxCat = document.getElementById('category-chart');
-            if (ctxCat) {
-                if (categoryChartInstance) categoryChartInstance.destroy();
-                const categories = {};
-                window.appData.episodes.forEach(e => { categories[e.category] = (categories[e.category] || 0) + 1; });
-                categoryChartInstance = new Chart(ctxCat, {
-                    type: 'doughnut',
-                    data: {
-                        labels: Object.keys(categories),
-                        datasets: [{ data: Object.values(categories), backgroundColor: ['#e11d48', '#f59e0b', '#0d9488', '#0284c7', '#8b5cf6'] }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false }
-                });
-            }
-        }
-
-        function initApp(shouldPush = true) {
-            renderDashboard();
-            renderSymptoms();
-            renderMedications();
-            renderAppointments();
-            populateAiSelect();
-            if (shouldPush) saveState(true);
-        }
-
-        window.initApp = initApp;
-
-        // Device Sync Modal Actions
-        function openSyncModal() {
-            const syncId = localStorage.getItem('carepulse_sync_code') || (window.CarePulseCloud?.userId || '');
-            document.getElementById('sync-code-input').value = syncId;
-            document.getElementById('sync-modal').classList.remove('hidden');
-        }
-
-        function closeSyncModal() {
-            document.getElementById('sync-modal').classList.add('hidden');
-        }
-
-        function applyNewSyncCode() {
-            const inputVal = document.getElementById('sync-code-input').value.trim();
-            if (!inputVal) return;
-            if (window.CarePulseCloud) {
-                window.CarePulseCloud.setSyncCode(inputVal);
-                showToast("Connected to Sync Group: " + inputVal, "info");
-            }
-            closeSyncModal();
-        }
-
-        function copySyncCode() {
-            const syncId = document.getElementById('display-sync-id').innerText;
-            if (!syncId) return;
-            navigator.clipboard.writeText(syncId);
-            showToast("Sync ID copied! Paste this on your other Android phone.", "info");
-        }
-
-        // Modals Management
-        function openEpisodeModal() {
-            document.getElementById('episode-form').reset();
-            document.getElementById('ep-startDate').value = getRelativeDate(0);
-            document.getElementById('episode-modal').classList.remove('hidden');
-        }
-
-        function closeEpisodeModal() {
-            document.getElementById('episode-modal').classList.add('hidden');
-        }
-
-        function handleEpisodeSubmit(e) {
-            e.preventDefault();
-            const newEp = {
-                id: 'ep-' + Date.now(),
-                title: document.getElementById('ep-title').value,
-                category: document.getElementById('ep-category').value,
-                status: 'Active',
-                startDate: document.getElementById('ep-startDate').value,
-                endDate: null,
-                primarySymptoms: document.getElementById('ep-primarySymptoms').value,
-                notes: document.getElementById('ep-notes').value
-            };
-            window.appData.episodes.push(newEp);
-            closeEpisodeModal();
-            showToast('New sickness episode logged!');
-            initApp();
-        }
-
-        function markEpisodeResolved(id) {
-            const ep = window.appData.episodes.find(e => e.id === id);
-            if (ep) {
-                ep.status = 'Resolved';
-                ep.endDate = getRelativeDate(0);
-                showToast(`Marked "${ep.title}" as resolved!`);
-                initApp();
-            }
-        }
-
-        function deleteEpisode(id) {
-            if (confirm('Delete this illness episode?')) {
-                window.appData.episodes = window.appData.episodes.filter(e => e.id !== id);
-                showToast('Episode deleted');
-                initApp();
-            }
-        }
-
-        function openSymptomModal(preselectedEpId) {
-            if (window.appData.episodes.length === 0) {
-                showToast('Please log a sickness episode first!', 'error');
-                openEpisodeModal();
-                return;
-            }
-            document.getElementById('symptom-form').reset();
-            document.getElementById('sym-date').value = getRelativeDate(0);
-            const select = document.getElementById('sym-episodeId');
-            select.innerHTML = window.appData.episodes.map(e => `<option value="${e.id}">${escapeHtml(e.title)}</option>`).join('');
-            if (preselectedEpId) select.value = preselectedEpId;
-            document.getElementById('symptom-modal').classList.remove('hidden');
-        }
-
-        function closeSymptomModal() {
-            document.getElementById('symptom-modal').classList.add('hidden');
-        }
-
-        function handleSymptomSubmit(e) {
-            e.preventDefault();
-            const newSym = {
-                id: 'sym-' + Date.now(),
-                episodeId: document.getElementById('sym-episodeId').value,
-                name: document.getElementById('sym-name').value,
-                category: document.getElementById('sym-category').value,
-                severity: Number(document.getElementById('sym-severity').value),
-                date: document.getElementById('sym-date').value,
-                time: document.getElementById('sym-time').value,
-                notes: document.getElementById('sym-notes').value
-            };
-            window.appData.symptoms.push(newSym);
-            closeSymptomModal();
-            showToast('Symptom entry saved!');
-            initApp();
-        }
-
-        function deleteSymptom(id) {
-            if (confirm('Delete symptom reading?')) {
-                window.appData.symptoms = window.appData.symptoms.filter(s => s.id !== id);
-                showToast('Symptom deleted');
-                initApp();
-            }
-        }
-
-        function openMedicationModal(preselectedEpId) {
-            if (window.appData.episodes.length === 0) {
-                showToast('Please log a sickness episode first!', 'error');
-                openEpisodeModal();
-                return;
-            }
-            document.getElementById('medication-form').reset();
-            const select = document.getElementById('med-episodeId');
-            select.innerHTML = window.appData.episodes.map(e => `<option value="${e.id}">${escapeHtml(e.title)}</option>`).join('');
-            if (preselectedEpId) select.value = preselectedEpId;
-            document.getElementById('medication-modal').classList.remove('hidden');
-        }
-
-        function closeMedicationModal() {
-            document.getElementById('medication-modal').classList.add('hidden');
-        }
-
-        function handleMedicationSubmit(e) {
-            e.preventDefault();
-            const newMed = {
-                id: 'med-' + Date.now(),
-                episodeId: document.getElementById('med-episodeId').value,
-                name: document.getElementById('med-name').value,
-                dosage: document.getElementById('med-dosage').value,
-                frequency: document.getElementById('med-frequency').value,
-                doctor: document.getElementById('med-doctor').value,
-                takenToday: true
-            };
-            window.appData.medications.push(newMed);
-            closeMedicationModal();
-            showToast('Treatment added!');
-            initApp();
-        }
-
-        function toggleMedTaken(id) {
-            const m = window.appData.medications.find(med => med.id === id);
-            if (m) {
-                m.takenToday = !m.takenToday;
-                renderMedications();
-                saveState(true);
-            }
-        }
-
-        function deleteMedication(id) {
-            if (confirm('Delete medication entry?')) {
-                window.appData.medications = window.appData.medications.filter(m => m.id !== id);
-                showToast('Treatment deleted');
-                initApp();
-            }
-        }
-
-        function openAppointmentModal() {
-            document.getElementById('appointment-form').reset();
-            document.getElementById('app-date').value = getRelativeDate(0);
-            document.getElementById('appointment-modal').classList.remove('hidden');
-        }
-
-        function closeAppointmentModal() {
-            document.getElementById('appointment-modal').classList.add('hidden');
-        }
-
-        function handleAppointmentSubmit(e) {
-            e.preventDefault();
-            const newApp = {
-                id: 'app-' + Date.now(),
-                doctor: document.getElementById('app-doctor').value,
-                date: document.getElementById('app-date').value,
-                time: document.getElementById('app-time').value,
-                reason: document.getElementById('app-reason').value
-            };
-            window.appData.appointments.push(newApp);
-            closeAppointmentModal();
-            showToast('Visit log saved!');
-            initApp();
-        }
-
-        function deleteAppointment(id) {
-            if (confirm('Delete visit log?')) {
-                window.appData.appointments = window.appData.appointments.filter(a => a.id !== id);
-                showToast('Visit deleted');
-                initApp();
-            }
-        }
-
-        // Gemini AI Integration Helpers
-        const GEMINI_API_KEY = "";
-
-        async function handleAiQuickLog() {
-            const inputEl = document.getElementById('ai-quick-log-input');
-            const text = inputEl.value.trim();
-            if (!text) return;
-
-            if (window.appData.episodes.length === 0) {
-                showToast('Please create a sickness episode first!', 'error');
-                openEpisodeModal();
-                return;
-            }
-
-            try {
-                const payload = {
-                    contents: [{ parts: [{ text: `Extract symptom entry JSON: "${text}"` }] }],
-                    systemInstruction: { parts: [{ text: "Extract symptomName, category, severity (1-10), notes" }] },
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                symptomName: { type: "STRING" },
-                                category: { type: "STRING" },
-                                severity: { type: "NUMBER" },
-                                notes: { type: "STRING" }
-                            },
-                            required: ["symptomName", "severity"]
-                        }
-                    }
-                };
-
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
-                const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                const data = await res.json();
-                const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
-
-                const activeEp = window.appData.episodes.find(e => e.status === 'Active') || window.appData.episodes[0];
-                const now = new Date();
-
-                const newSym = {
-                    id: 'sym-' + Date.now(),
-                    episodeId: activeEp.id,
-                    name: parsed.symptomName || 'Logged Symptom',
-                    category: parsed.category || 'Body & Systemic (Fever/Chills)',
-                    severity: Math.min(10, Math.max(1, Math.round(Number(parsed.severity) || 5))),
-                    date: getRelativeDate(0),
-                    time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
-                    notes: parsed.notes || text
-                };
-
-                window.appData.symptoms.push(newSym);
-                inputEl.value = '';
-                initApp();
-                showToast(`AI Synced: "${newSym.name}" (${newSym.severity}/10)`);
-            } catch (err) {
-                showToast('AI parse failed. Try logging manually.', 'error');
-            }
-        }
-
-        function populateAiSelect() {
-            const select = document.getElementById('ai-episode-select');
-            if (!select) return;
-            select.innerHTML = window.appData.episodes.map(e => `<option value="${e.id}">${escapeHtml(e.title)} (${formatDateNice(e.startDate)})</option>`).join('');
-        }
-
-        function openAiInsightsForEpisode(episodeId) {
-            switchTab('ai');
-            const select = document.getElementById('ai-episode-select');
-            if (select) {
-                select.value = episodeId;
-                generateAiEpisodeInsights();
-            }
-        }
-
-        async function generateAiEpisodeInsights() {
-            const select = document.getElementById('ai-episode-select');
-            const epId = select ? select.value : (window.appData.episodes[0]?.id);
-            if (!epId) return;
-
-            const ep = window.appData.episodes.find(e => e.id === epId);
-            const container = document.getElementById('ai-insights-container');
-
-            container.innerHTML = `<div class="p-8 text-center bg-white rounded-2xl"><i class="fa-solid fa-sparkles text-3xl text-purple-600 animate-pulse"></i><p class="mt-2 text-sm">Generating AI doctor prep...</p></div>`;
-
-            try {
-                const prompt = `Analyze illness episode: Title: ${ep.title}, Category: ${ep.category}, Symptoms: ${ep.primarySymptoms}. Return JSON with doctorQuestions, redFlags, recoveryCareTips, clinicalSummary, audioBriefingScript.`;
-                const payload = {
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                doctorQuestions: { type: "ARRAY", items: { type: "STRING" } },
-                                redFlags: { type: "ARRAY", items: { type: "STRING" } },
-                                recoveryCareTips: { type: "ARRAY", items: { type: "STRING" } },
-                                clinicalSummary: { type: "STRING" },
-                                audioBriefingScript: { type: "STRING" }
-                            },
-                            required: ["doctorQuestions", "redFlags", "recoveryCareTips", "clinicalSummary"]
-                        }
-                    }
-                };
-
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
-                const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                const result = await res.json();
-                const insights = JSON.parse(result.candidates[0].content.parts[0].text);
-
-                container.innerHTML = `
-                    <div class="bg-gradient-to-r from-purple-900 to-indigo-900 text-white p-5 rounded-2xl">
-                        <h3 class="font-bold text-lg">${escapeHtml(ep.title)}</h3>
-                        <p class="text-xs text-purple-200 mt-1">${escapeHtml(insights.audioBriefingScript || insights.clinicalSummary)}</p>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="bg-amber-50 p-4 rounded-xl border border-amber-200">
-                            <h4 class="font-bold text-amber-900 text-sm">Questions for Doctor</h4>
-                            <ul class="text-xs mt-2 space-y-1">${insights.doctorQuestions.map(q => `<li>• ${escapeHtml(q)}</li>`).join('')}</ul>
-                        </div>
-                        <div class="bg-rose-50 p-4 rounded-xl border border-rose-200">
-                            <h4 class="font-bold text-rose-900 text-sm">Red Flag Warnings</h4>
-                            <ul class="text-xs mt-2 space-y-1">${insights.redFlags.map(rf => `<li>• ${escapeHtml(rf)}</li>`).join('')}</ul>
-                        </div>
-                    </div>
-                `;
-            } catch (err) {
-                container.innerHTML = `<div class="p-6 text-center text-rose-600">Error generating AI insights.</div>`;
-            }
-        }
-
-        // Import CSV & Sheets logic
-        function openImportModal() {
-            document.getElementById('import-preview-container').classList.add('hidden');
-            document.getElementById('import-modal').classList.remove('hidden');
-        }
-
-        function closeImportModal() {
-            document.getElementById('import-modal').classList.add('hidden');
-        }
-
-        function switchImportMethod(method) {
-            ['url', 'file', 'paste'].forEach(m => {
-                const tab = document.getElementById(`import-tab-${m}`);
-                const section = document.getElementById(`import-method-${m}`);
-                if (m === method) {
-                    tab.className = 'flex-1 py-2 rounded-lg bg-white shadow-sm text-indigo-700 font-bold';
-                    section.classList.remove('hidden');
-                } else {
-                    tab.className = 'flex-1 py-2 rounded-lg text-slate-600';
-                    section.classList.add('hidden');
-                }
-            });
-        }
-
-        async function handleGoogleSheetUrlImport() {
-            const urlInput = document.getElementById('import-gsheet-url').value.trim();
-            if (!urlInput) return;
-            try {
-                let csvUrl = urlInput;
-                const match = urlInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
-                if (match && match[1]) {
-                    csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/gviz/tq?tqx=out:csv`;
-                }
-                const response = await fetch(csvUrl);
-                const csvText = await response.text();
-                processParsedRows(parseCSVText(csvText));
-            } catch (err) {
-                showToast('Failed to fetch Google Sheet.', 'error');
-            }
-        }
-
-        function parseCSVText(text) {
-            return text.split(/\r\n|\n/).map(l => l.split(',').map(c => c.replace(/^["']|["']$/g, '').trim()));
-        }
-
-        function processParsedRows(matrix) {
-            const dataRows = matrix.slice(1);
-            const episodes = dataRows.map((row, idx) => ({
-                id: 'ep-imported-' + Date.now() + '-' + idx,
-                title: row[0] || `Imported Sickness #${idx + 1}`,
-                category: row[1] || 'Other Sickness',
-                status: 'Resolved',
-                startDate: getRelativeDate(-7),
-                primarySymptoms: row[5] || '',
-                notes: 'Imported Record'
-            }));
-            window.appData.episodes.unshift(...episodes);
-            closeImportModal();
-            initApp();
-            showToast(`Imported ${episodes.length} episodes and synced across devices!`);
-        }
-
-        window.onload = function() {
-            initApp(false);
-        };
-    </script>
+      });
+
+      if (newEpisodes.length > 0) {
+        careData.episodes = [...newEpisodes, ...careData.episodes];
+        pushToCloud();
+        alert(`Successfully imported ${newEpisodes.length} sickness records! Both phones updated.`);
+        switchTab('episodes');
+      } else {
+        alert("Could not parse rows. Ensure lines are formatted as: Title,Category,StartDate,EndDate,Status,Symptoms");
+      }
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.nav-tab').forEach(el => {
+        el.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600');
+        el.classList.add('text-slate-600');
+      });
+      document.getElementById('tab-' + tab).classList.remove('hidden');
+      const activeBtn = document.getElementById('tab-btn-' + tab);
+      if (activeBtn) activeBtn.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
+    }
+
+    function openPairingModal() {
+      document.getElementById('pairing-modal').classList.remove('hidden');
+      document.getElementById('sync-key-display').innerText = currentSyncKey;
+      document.getElementById('qrcode-container').innerHTML = '';
+      new QRCode(document.getElementById('qrcode-container'), {
+        text: currentSyncKey,
+        width: 128,
+        height: 128
+      });
+    }
+
+    function closePairingModal() {
+      document.getElementById('pairing-modal').classList.add('hidden');
+    }
+
+    function copySyncKey() {
+      navigator.clipboard.writeText(currentSyncKey);
+      alert('Sync code copied to clipboard!');
+    }
+
+    function connectCustomSyncKey() {
+      const key = document.getElementById('sync-key-input').value.trim().toUpperCase();
+      if (key) {
+        currentSyncKey = key;
+        localStorage.setItem('carepulse_firestore_key', currentSyncKey);
+        connectFirestoreSync();
+        closePairingModal();
+      }
+    }
+
+    renderAll();
+  </script>
 </body>
 </html>
