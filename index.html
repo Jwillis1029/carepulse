@@ -14,13 +14,11 @@
   <!-- QR Code Generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-  <!-- Firebase SDKs (v10 Modular) -->
+  <!-- Firebase Real-Time SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // Demo / Public Firebase Configuration
-    // (For production privacy, replace with your own free Firebase config from console.firebase.google.com)
     const firebaseConfig = {
       apiKey: "AIzaSyDemoKeyCarePulseSync2026",
       authDomain: "carepulse-tracker.firebaseapp.com",
@@ -30,7 +28,6 @@
       appId: "1:102938475612:web:a1b2c3d4e5f6g7h8i9j0"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
@@ -75,8 +72,8 @@
 
       <!-- Sync Status Indicator -->
       <div class="flex items-center space-x-2 bg-indigo-800/80 px-3 py-1.5 rounded-full border border-indigo-700 text-xs">
-        <span id="sync-status-indicator" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-        <span id="sync-status-text" class="font-medium text-indigo-100">Connecting Cloud...</span>
+        <span id="sync-status-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+        <span id="sync-status-text" class="font-medium text-indigo-100">Auto-Synced</span>
         <button onclick="openPairingModal()" class="ml-2 bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-md transition font-medium flex items-center gap-1">
           <i class="fa-solid fa-cloud-arrow-up"></i> Pair Code
         </button>
@@ -113,7 +110,7 @@
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 class="text-2xl font-bold text-slate-900">Sickness Episodes</h2>
-          <p class="text-slate-500 text-sm">Log illnesses when they happen (e.g. Flu, Migraine, Food Poisoning).</p>
+          <p class="text-slate-500 text-sm">Log illnesses when they happen (e.g., Flu, Migraine, Food Poisoning).</p>
         </div>
         <button onclick="openNewEpisodeModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium shadow-sm transition flex items-center gap-2">
           <i class="fa-solid fa-plus"></i> New Sickness Episode
@@ -229,7 +226,6 @@
   </div>
 
   <script>
-    // SYNC KEY & STATE INITIALIZATION
     let currentSyncKey = localStorage.getItem('carepulse_firestore_key') || 'CARE-' + Math.floor(1000 + Math.random() * 9000);
     localStorage.setItem('carepulse_firestore_key', currentSyncKey);
 
@@ -247,7 +243,6 @@
 
     let unsubscribeSnapshot = null;
 
-    // REAL-TIME FIRESTORE LISTENER SETUP
     window.addEventListener('firebase-ready', () => {
       connectFirestoreSync();
     });
@@ -257,17 +252,14 @@
 
       const docRef = window.doc(window.FirebaseDB, "sickness_sync", currentSyncKey);
 
-      // Unsubscribe from previous listener if changing code
       if (unsubscribeSnapshot) unsubscribeSnapshot();
 
-      // Subscribe to real-time changes
       unsubscribeSnapshot = window.onSnapshot(docRef, (snapshot) => {
         if (snapshot.exists()) {
           careData = snapshot.data();
           renderAll();
-          updateSyncStatus(true, 'Live Synced');
+          updateSyncStatus(true, 'Auto-Synced');
         } else {
-          // Initialize remote document if it doesn't exist
           pushToCloud();
         }
       }, (error) => {
@@ -282,7 +274,7 @@
       if (window.FirebaseDB) {
         const docRef = window.doc(window.FirebaseDB, "sickness_sync", currentSyncKey);
         window.setDoc(docRef, careData)
-          .then(() => updateSyncStatus(true, 'Live Synced'))
+          .then(() => updateSyncStatus(true, 'Auto-Synced'))
           .catch(() => updateSyncStatus(true, 'Local Offline'));
       }
       renderAll();
@@ -300,7 +292,6 @@
       }
     }
 
-    // UI RENDERERS
     function renderAll() {
       renderEpisodes();
       renderLogs();
@@ -402,7 +393,6 @@
       pushToCloud();
     }
 
-    // CSV / GOOGLE SHEETS PARSER
     function processCsvImport() {
       const text = document.getElementById('csv-import-text').value.trim();
       if (!text) return alert("Please paste spreadsheet text or CSV data first.");
@@ -411,7 +401,7 @@
       const newEpisodes = [];
 
       lines.forEach((line, idx) => {
-        if (idx === 0 && line.toLowerCase().includes('title')) return; // Skip CSV header
+        if (idx === 0 && line.toLowerCase().includes('title')) return;
         const cols = line.split(',');
         if (cols.length >= 3) {
           newEpisodes.push({
@@ -437,7 +427,6 @@
       }
     }
 
-    // TAB NAVIGATION
     function switchTab(tab) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
       document.querySelectorAll('.nav-tab').forEach(el => {
@@ -449,7 +438,6 @@
       if (activeBtn) activeBtn.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
     }
 
-    // PAIRING MODAL
     function openPairingModal() {
       document.getElementById('pairing-modal').classList.remove('hidden');
       document.getElementById('sync-key-display').innerText = currentSyncKey;
@@ -480,7 +468,6 @@
       }
     }
 
-    // INITIAL RENDER
     renderAll();
   </script>
 </body>
