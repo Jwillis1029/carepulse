@@ -56,24 +56,87 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Environment variables
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'carepulse-health-tracker';
         const firebaseConfig = {
-              apiKey: "AIzaSyDg29tDO3WCEhtwMfRD1KmX-H9OyG4UKeM",
-              authDomain: "carepulse-70f27.firebaseapp.com",
-              projectId: "carepulse-70f27",
-              storageBucket: "carepulse-70f27.firebasestorage.app",
-              messagingSenderId: "613705434979",
-              appId: "1:613705434979:web:bf0333bb42411e7188f556",
-              measurementId: "G-NRZ000ZZ2X"
+            apiKey: "AIzaSyDg29tDO3WCEhtwMfRD1KmX-H9OyG4UKeM",
+            authDomain: "carepulse-70f27.firebaseapp.com",
+            projectId: "carepulse-70f27",
+            storageBucket: "carepulse-70f27.firebasestorage.app",
+            messagingSenderId: "613705434979",
+            appId: "1:613705434979:web:bf0333bb42411e7188f556",
+            measurementId: "G-NRZ000ZZ2X"
         };
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+
+        let unsubscribeSync = null;
+
+        // 1. Authenticate before attaching Firestore listeners
+        onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            console.log("Firebase Auth active. User UID:", user.uid);
+            // Retrieve or prompt for Sync ID (e.g. stored in localStorage or UI field)
+            const currentSyncId = localStorage.getItem("carepulse_sync_id") || "default-family-room";
+            startLiveSync(currentSyncId);
+          } else {
+            try {
+              if (initialAuthToken) {
+                await signInWithCustomToken(auth, initialAuthToken);
+              } else {
+                await signInAnonymously(auth);
+              }
+            } catch (err) {
+              console.error("Firebase Authentication failed:", err);
+            }
+           }
+         });
+
+         // 2. Real-time Sync Listener across devices
+         window.startLiveSync = function(syncRoomId) {
+           if (unsubscribeSync) unsubscribeSync(); // Unsubscribe previous room listener if changing rooms
+
+           const roomRef = doc(db, "sync_rooms", syncRoomId);
+
+           unsubscribeSync = onSnapshot(roomRef, (docSnap) => {
+             if (docSnap.exists()) {
+               const remoteData = docSnap.data();
+               console.log("Real-time data received from cloud:", remoteData);
+
+               // TRIGGER YOUR APP UI UPDATE HERE
+               if (typeof window.onRemoteDataReceived === "function") {
+                 window.onRemoteDataReceived(remoteData);
+               }
+              }
+           }, (error) => {
+             console.error("Firestore sync subscription error:", error);
+           });
+         };
+
+         // 3. Push local changes to Firestore
+         window.pushDataToCloud = async function(syncRoomId, appData) {
+           if (!auth.currentUser) {
+             console.warn("Cannot push data: Auth not initialized yet.");
+             return;
+           }
+           try {
+             const roomRef = doc(db, "sync_rooms", syncRoomId);
+             await setDoc(roomRef, {
+               ...appData,
+               lastUpdated: new Date().toISOString(),
+               updatedBy: auth.currentUser.uid
+             }, { merge: true });
+             console.log("Data pushed successfully to room:", syncRoomId);
+           } catch (err) {
+             console.error("Error saving data to Firestore:", err);
+           }
+         };
+       </script>
 
         window.CarePulseCloud = {
             db,
